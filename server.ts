@@ -360,7 +360,7 @@ async function startServer() {
   } else {
     app.use(express.static('dist'));
     app.get('*', (req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+      res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
     });
   }
 

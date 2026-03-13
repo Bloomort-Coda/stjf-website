@@ -19,7 +19,7 @@ export default function ArticleView() {
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative -mt-8 mb-16 h-[500px] md:h-[600px] flex items-center justify-center overflow-hidden bg-gray-900">
+      <section className="relative -mt-8 mb-16 h-[200px] md:h-[250px] flex items-center justify-center overflow-hidden bg-gray-900">
         <div className="absolute inset-0 bg-black/60 z-10"></div>
         {article.featured_image ? (
           <img 

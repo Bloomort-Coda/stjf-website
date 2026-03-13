@@ -39,7 +39,7 @@ export default function CategoryView() {
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative -mt-8 mb-16 h-[400px] md:h-[500px] flex items-center justify-center overflow-hidden bg-gray-900">
+      <section className="relative -mt-8 mb-16 h-[150px] md:h-[200px] flex items-center justify-center overflow-hidden bg-gray-900">
         <div className="absolute inset-0 bg-black/60 z-10"></div>
         <img 
           src={coverImage} 
