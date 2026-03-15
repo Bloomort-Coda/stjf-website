@@ -9,6 +9,7 @@ export default function ManageCategories() {
   const [parentId, setParentId] = useState<string>("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchCategories = () => {
     fetch("/api/categories")
@@ -63,12 +64,13 @@ export default function ManageCategories() {
     setIsFormVisible(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure? This might orphan articles.")) return;
-    await fetch(`/api/categories/${id}`, {
+  const confirmDelete = async () => {
+    if (deletingId === null) return;
+    await fetch(`/api/categories/${deletingId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
+    setDeletingId(null);
     fetchCategories();
   };
 
@@ -212,7 +214,7 @@ export default function ManageCategories() {
               )}
               {hasPermission("delete") && (
                 <button
-                  onClick={() => handleDelete(cat.id)}
+                  onClick={() => setDeletingId(cat.id)}
                   disabled={cat.subcategory_count > 0 || cat.article_count > 0}
                   title={
                     cat.subcategory_count > 0
@@ -230,6 +232,31 @@ export default function ManageCategories() {
           </div>
         ))}
       </div>
+
+      {deletingId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--card)] p-6 rounded-2xl max-w-sm w-full border border-[var(--border)]">
+            <h3 className="text-xl font-bold mb-4">Delete Category?</h3>
+            <p className="mb-6 opacity-80">
+              Are you sure you want to delete this category? This might orphan articles.
+            </p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setDeletingId(null)}
+                className="px-4 py-2 rounded-lg font-medium hover:bg-[var(--background)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

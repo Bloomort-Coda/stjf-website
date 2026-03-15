@@ -9,6 +9,8 @@ export default function ManageUsers() {
   const [password, setPassword] = useState("");
   const [permissions, setPermissions] = useState<string[]>(["read"]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const availablePermissions = ["admin", "read", "create", "update", "delete"];
 
@@ -43,33 +45,40 @@ export default function ManageUsers() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     const role = permissions.join(",");
 
-    if (editingId) {
-      await fetch(`/api/users/${editingId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ role, password: password || undefined }),
-      });
-    } else {
-      await fetch("/api/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ username, password, role }),
-      });
-    }
+    try {
+      if (editingId) {
+        const res = await fetch(`/api/users/${editingId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ role, password: password || undefined }),
+        });
+        if (!res.ok) throw new Error("Failed to update user");
+      } else {
+        const res = await fetch("/api/users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ username, password, role }),
+        });
+        if (!res.ok) throw new Error("Failed to create user");
+      }
 
-    setUsername("");
-    setPassword("");
-    setPermissions(["read"]);
-    setEditingId(null);
-    fetchUsers();
+      setUsername("");
+      setPassword("");
+      setPermissions(["read"]);
+      setEditingId(null);
+      fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    }
   };
 
   const handleEdit = (user: any) => {
@@ -77,14 +86,16 @@ export default function ManageUsers() {
     setUsername(user.username);
     setPassword("");
     setPermissions(user.role.split(","));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure?")) return;
-    await fetch(`/api/users/${id}`, {
+  const confirmDelete = async () => {
+    if (deletingId === null) return;
+    await fetch(`/api/users/${deletingId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
+    setDeletingId(null);
     fetchUsers();
   };
 
@@ -108,6 +119,11 @@ export default function ManageUsers() {
         <h2 className="text-2xl font-sans font-bold mb-2">
           {editingId ? "Edit User" : "Create New User"}
         </h2>
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">
@@ -216,7 +232,7 @@ export default function ManageUsers() {
               </button>
               {user.username !== "admin" && (
                 <button
-                  onClick={() => handleDelete(user.id)}
+                  onClick={() => setDeletingId(user.id)}
                   className="text-red-500 hover:bg-red-500 hover:text-white border border-transparent hover:border-red-500 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                 >
                   Delete
@@ -226,6 +242,31 @@ export default function ManageUsers() {
           </div>
         ))}
       </div>
+
+      {deletingId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--card)] p-6 rounded-2xl max-w-sm w-full border border-[var(--border)]">
+            <h3 className="text-xl font-bold mb-4">Delete User?</h3>
+            <p className="mb-6 opacity-80">
+              Are you sure you want to delete this user? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setDeletingId(null)}
+                className="px-4 py-2 rounded-lg font-medium hover:bg-[var(--background)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

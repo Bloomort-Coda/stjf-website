@@ -7,6 +7,8 @@ export default function DocumentImport() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const { token } = useAuth();
 
   const fetchDocuments = () => {
@@ -31,27 +33,32 @@ export default function DocumentImport() {
     }
 
     try {
-      await fetch("/api/documents/upload", {
+      setError(null);
+      const res = await fetch("/api/documents/upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+      if (!res.ok) {
+        throw new Error("Upload failed");
+      }
       setFile(null);
       setTitle("");
       fetchDocuments();
     } catch (err) {
-      alert("Upload failed");
+      setError("Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure?")) return;
-    await fetch(`/api/documents/${id}`, {
+  const confirmDelete = async () => {
+    if (deletingId === null) return;
+    await fetch(`/api/documents/${deletingId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
+    setDeletingId(null);
     fetchDocuments();
   };
 
@@ -74,6 +81,11 @@ export default function DocumentImport() {
         <h2 className="text-2xl font-sans font-bold mb-2">
           Upload .docx File
         </h2>
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
         <p className="text-sm text-gray-500 mb-6 font-medium">
           Upload a Microsoft Word document to convert it to HTML. This is
           typically used for weekly bulletins.
@@ -154,7 +166,7 @@ export default function DocumentImport() {
                 <Printer size={16} /> Print A4
               </button>
               <button
-                onClick={() => handleDelete(doc.id)}
+                onClick={() => setDeletingId(doc.id)}
                 className="flex items-center gap-2 text-red-500 hover:bg-red-500 hover:text-white border border-transparent hover:border-red-500 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
               >
                 <Trash2 size={16} /> Delete
@@ -163,6 +175,31 @@ export default function DocumentImport() {
           </div>
         ))}
       </div>
+
+      {deletingId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--card)] p-6 rounded-2xl max-w-sm w-full border border-[var(--border)]">
+            <h3 className="text-xl font-bold mb-4">Delete Document?</h3>
+            <p className="mb-6 opacity-80">
+              Are you sure you want to delete this document? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setDeletingId(null)}
+                className="px-4 py-2 rounded-lg font-medium hover:bg-[var(--background)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

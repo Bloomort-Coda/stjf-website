@@ -28,10 +28,6 @@ const quillModules = {
     ["link", "image", "video"],
     ["clean"],
   ],
-  imageResize: {
-    parchment: Quill.import("parchment"),
-    modules: ["Resize", "DisplaySize", "Toolbar"],
-  },
 };
 
 export default function ManageArticles() {
@@ -58,21 +54,14 @@ export default function ManageArticles() {
   
   // Form visibility state
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    import("quill-image-resize-module-react")
-      .then((module) => {
-        Quill.register("modules/imageResize", module.default || module);
-        setEditorReady(true);
-      })
-      .catch((err) => {
-        console.error("Failed to load image resize module", err);
-        setEditorReady(true); // Still render editor even if module fails
-      });
+    setEditorReady(true);
   }, []);
 
   const fetchArticles = () => {
-    fetch("/api/articles")
+    fetch(`/api/articles?t=${new Date().getTime()}`)
       .then((r) => r.json())
       .then(setArticles);
   };
@@ -143,23 +132,52 @@ export default function ManageArticles() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    if (!title.trim()) {
+      setError("Title is required");
+      return;
+    }
+    if (!author.trim()) {
+      setError("Author is required");
+      return;
+    }
+
     const url = editingId ? `/api/articles/${editingId}` : "/api/articles";
     const method = editingId ? "PUT" : "POST";
 
-    await fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        title,
-        content,
-        author,
-        featured_image: featuredImage,
-        category_id: categoryId ? parseInt(categoryId) : null,
-      }),
-    });
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title,
+          content,
+          author,
+          featured_image: featuredImage,
+          category_id: categoryId ? parseInt(categoryId) : null,
+        }),
+      });
+      
+      if (!res.ok) {
+        let errorMessage = 'Unknown error';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP Error ${res.status}: ${res.statusText}`;
+        }
+        setError(`Failed to save article: ${errorMessage}`);
+        return;
+      }
+    } catch (err) {
+      console.error("Failed to save article", err);
+      setError("Failed to save article. Please check the console.");
+      return;
+    }
 
     setEditingId(null);
     setTitle("");
@@ -173,12 +191,13 @@ export default function ManageArticles() {
 
   const handleEdit = (article: any) => {
     setEditingId(article.id);
-    setTitle(article.title);
-    setContent(article.content);
-    setAuthor(article.author);
+    setTitle(article.title || "");
+    setContent(article.content || "");
+    setAuthor(article.author || "");
     setCategoryId(article.category_id ? article.category_id.toString() : "");
     setFeaturedImage(article.featured_image || "");
     setIsFormVisible(true);
+    setError(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -224,6 +243,11 @@ export default function ManageArticles() {
               {editingId ? "Edit Article" : "Create New Article"}
             </h2>
           </div>
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <span className="block sm:inline">{error}</span>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">
@@ -232,7 +256,6 @@ export default function ManageArticles() {
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                required
                 className="w-full p-3 rounded-xl border border-[var(--border)] bg-[var(--background)] focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
                 placeholder="Article Title"
               />
@@ -244,7 +267,6 @@ export default function ManageArticles() {
               <input
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
-                required
                 className="w-full p-3 rounded-xl border border-[var(--border)] bg-[var(--background)] focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
                 placeholder="Author Name"
               />
@@ -354,6 +376,7 @@ export default function ManageArticles() {
                 setCategoryId("");
                 setFeaturedImage("");
                 setIsFormVisible(false);
+                setError(null);
               }}
               className="bg-[var(--border)] px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-gray-200 transition-colors"
             >
@@ -383,8 +406,8 @@ export default function ManageArticles() {
                   )}
                 </p>
               </div>
-              {hasPermission("delete") && (
-                <div className="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity w-full md:w-auto justify-end">
+              <div className="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity w-full md:w-auto justify-end">
+                {hasPermission("update") && (
                   <button
                     type="button"
                     onClick={() => handleEdit(article)}
@@ -392,14 +415,16 @@ export default function ManageArticles() {
                   >
                     Edit
                   </button>
+                )}
+                {hasPermission("delete") && (
                   <button
                     onClick={() => setDeletingId(article.id)}
                     className="text-red-500 hover:bg-red-500 hover:text-white border border-transparent hover:border-red-500 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
                   >
                     Delete
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>

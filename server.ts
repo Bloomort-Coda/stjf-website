@@ -14,6 +14,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-product
 
 // Setup SQLite Database
 const db = new Database('database.sqlite');
+db.pragma('journal_mode = WAL');
 
 // Initialize Database Schema
 db.exec(`
@@ -109,6 +110,12 @@ const authorize = (requiredPermission: string) => {
 };
 
 // --- API ROUTES ---
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // Auth
 app.post('/api/auth/login', (req, res) => {
@@ -222,10 +229,15 @@ app.post('/api/articles', authenticateToken, authorize('create'), (req, res) => 
 });
 
 app.put('/api/articles/:id', authenticateToken, authorize('update'), (req, res) => {
-  const { title, content, author, featured_image, category_id } = req.body;
-  db.prepare('UPDATE articles SET title = ?, content = ?, author = ?, featured_image = ?, category_id = ? WHERE id = ?')
-    .run(title, content, author, featured_image, category_id || null, req.params.id);
-  res.json({ success: true });
+  try {
+    const { title, content, author, featured_image, category_id } = req.body;
+    db.prepare('UPDATE articles SET title = ?, content = ?, author = ?, featured_image = ?, category_id = ? WHERE id = ?')
+      .run(title, content, author, featured_image, category_id || null, req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating article:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.delete('/api/articles/:id', authenticateToken, authorize('delete'), (req, res) => {
